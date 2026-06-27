@@ -30,6 +30,7 @@ synthetic data.
 | `STRUCTURING` | Repeated amounts parked just below the threshold | High |
 | `RAPID_FIRE` | Many withdrawals in a single day (layering) | High |
 | `HIGH_VELOCITY` | Aggregate 24h outflow above a velocity limit | High |
+| `PASS_THROUGH` | A deposit forwarded straight back out within 24h (layering) | High |
 | `SHARED_ADDRESS` | One destination address funded by many users (mixer / P2P) | Critical |
 
 Each alert is a small auditable record: `user_id, rule, severity, detail, evidence`.
@@ -54,12 +55,13 @@ Outputs:
 ```
  Transactions analysed : 762
  Users                 : 120
- Alerts raised         : 48
+ Alerts raised         : 56
  Users flagged         : 16
  Alerts by rule:
    SHARED_ADDRESS     18
    LARGE_TRANSACTION  16
    STRUCTURING         8
+   PASS_THROUGH        8
    HIGH_VELOCITY       6
 ```
 

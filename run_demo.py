@@ -20,7 +20,7 @@ SEV_COLOR = {"CRITICAL": "#C0392B", "HIGH": "#E67E22", "MEDIUM": "#B8860B", "LOW
 RULE_LABEL = {
     "SHARED_ADDRESS": "Shared address", "LARGE_TRANSACTION": "Large transaction",
     "STRUCTURING": "Structuring", "HIGH_VELOCITY": "High velocity",
-    "RAPID_FIRE": "Rapid-fire",
+    "RAPID_FIRE": "Rapid-fire", "PASS_THROUGH": "Pass-through",
 }
 
 

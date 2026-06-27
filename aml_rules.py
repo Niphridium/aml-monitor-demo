@@ -19,6 +19,12 @@ RAPID_FIRE_PER_DAY = 5          # withdrawals/day that look like layering
 VELOCITY_24H_USD = 1_000_000    # aggregate outflow over 24h
 SHARED_ADDRESS_MIN_USERS = 5    # distinct users paying into one address
 
+# pass-through / layering: a deposit forwarded straight back out
+PASS_THROUGH_WINDOW_H = 24             # hours between deposit and forwarding
+PASS_THROUGH_MIN_DEPOSIT_USD = 50_000  # only consider material deposits
+PASS_THROUGH_RATIO_LO = 0.8            # min share of the deposit sent on in-window
+PASS_THROUGH_RATIO_HI = 1.5            # above this it's volume (HIGH_VELOCITY), not pass-through
+
 
 def _flag(uid, rule, severity, detail, evidence):
     return {"user_id": uid, "rule": rule, "severity": severity,
@@ -95,7 +101,42 @@ def shared_addresses(df: pd.DataFrame) -> list[dict]:
     return flags
 
 
-RULES = [large_transactions, structuring, rapid_fire, velocity, shared_addresses]
+def pass_through(df: pd.DataFrame) -> list[dict]:
+    """A deposit that is forwarded straight back out within a short window.
+
+    Classic layering / 'pass-through' behaviour: funds arrive and a similar
+    (or larger) amount leaves shortly after, so the account is a conduit rather
+    than a store of value. Complements RAPID_FIRE (count-based) and
+    HIGH_VELOCITY (volume-based) by tying an outflow back to a specific inflow.
+    """
+    flags = []
+    window = pd.Timedelta(hours=PASS_THROUGH_WINDOW_H)
+    for uid, g in df.sort_values("timestamp").groupby("user_id"):
+        deposits = g[g["direction"] == "deposit"]
+        withdrawals = g[g["direction"] == "withdrawal"]
+        if deposits.empty or withdrawals.empty:
+            continue
+        best = None  # most pass-through-like instance: ratio closest to 1.0
+        for t0, amt in zip(deposits["timestamp"], deposits["amount_usd"]):
+            if amt < PASS_THROUGH_MIN_DEPOSIT_USD:
+                continue
+            sent = withdrawals[(withdrawals["timestamp"] > t0) &
+                               (withdrawals["timestamp"] <= t0 + window)]["amount_usd"].sum()
+            ratio = sent / amt
+            if PASS_THROUGH_RATIO_LO <= ratio <= PASS_THROUGH_RATIO_HI:
+                if best is None or abs(ratio - 1.0) < abs(best[0] - 1.0):
+                    best = (ratio, amt, sent, t0)
+        if best is not None:
+            ratio, amt, sent, t0 = best
+            flags.append(_flag(
+                uid, "PASS_THROUGH", "HIGH",
+                f"${amt:,.0f} deposit forwarded out within {PASS_THROUGH_WINDOW_H}h "
+                f"(${sent:,.0f}, {ratio:.0%})",
+                f"deposit at {t0:%Y-%m-%d %H:%M} -> {ratio:.0%} sent on (possible layering)"))
+    return flags
+
+
+RULES = [large_transactions, structuring, rapid_fire, velocity, shared_addresses, pass_through]
 SEVERITY_WEIGHT = {"LOW": 1, "MEDIUM": 2, "HIGH": 4, "CRITICAL": 8}
 
 
